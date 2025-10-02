@@ -78,16 +78,36 @@ def convert_abbreviated_to_number(s):
             return 0
 
 # ---------------------------------------------------------------------------------------
-# Main script
+# FastAPI app
 # ---------------------------------------------------------------------------------------
-def main():
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import List
+import uvicorn
+
+app = FastAPI()
+
+class ScrapeRequest(BaseModel):
+    profile_url: str
+    num_posts: int
+
+@app.post("/scrape")
+def scrape_linkedin_posts(req: ScrapeRequest):
+    try:
+        # Use a fixed cookies file path (user must provide this file)
+        cookies_file = "./your_linkedin_cookies.txt"
+        # Call the refactored scraping function
+        posts = scrape_posts(req.profile_url, cookies_file, req.num_posts)
+        return {"posts": posts}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def scrape_posts(user_profile_url, cookies_file, max_posts):
     # --------------------------------
     # Customize these variables
     # --------------------------------
-    user_profile_url = "https://www.linkedin.com/in/harishkumark025/recent-activity/all/"  
-    cookies_file = "./your_linkedin_cookies.txt"  # Path to your cookies (Netscape format)
-    json_file = "./user_posts_extended.json"    # JSON output file
-    MAX_POSTS = 20                          # Increase to get enough unique posts
+    json_file = None  # Not used in API mode
+    MAX_POSTS = max_posts                          # Increase to get enough unique posts
     MAX_SCROLL_ATTEMPTS = 40               # Increase how many times we scroll
     MAX_NO_NEW_POSTS_IN_A_ROW = 3          # If we see 3 scrolls with no new posts, stop
     
@@ -319,13 +339,26 @@ def main():
     print(f"[*] Finished after collecting {post_count} unique posts.")
     print("[*] Closing browser.")
     browser.quit()
-    # Write all posts to JSON file
-    with open(json_file, mode='w', encoding='utf-8') as f:
-        json.dump(posts_data, f, ensure_ascii=False, indent=2)
-    print(f"[*] Data saved to {json_file}")
+    return posts_data
 
-# ---------------------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------------------
+def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Scrape LinkedIn posts from a public profile.")
+    parser.add_argument('--profile_url', type=str, required=True, help='LinkedIn profile URL')
+    parser.add_argument('--num_posts', type=int, default=5, help='Number of posts to scrape')
+    parser.add_argument('--cookies_file', type=str, default='./your_linkedin_cookies.txt', help='Path to cookies.txt file')
+    parser.add_argument('--output', type=str, default='posts.json', help='Output JSON file')
+    args = parser.parse_args()
+
+    posts = scrape_posts(args.profile_url, args.cookies_file, args.num_posts)
+    with open(args.output, 'w', encoding='utf-8') as f:
+        json.dump(posts, f, ensure_ascii=False, indent=2)
+    print(f"[*] Saved {len(posts)} posts to {args.output}")
+
+# If you want to run the API with: python scrape.py
 if __name__ == "__main__":
-    main()
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "cli":
+        main()
+    else:
+        uvicorn.run("scrape:app", host="0.0.0.0", port=8000, reload=True)
