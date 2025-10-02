@@ -24,6 +24,12 @@ To run this script, you need to install the following Python packages and tools:
 
 ### Step 1: Install Python Packages
 You can install the required Python packages using pip. Run the following command in your terminal:
+
+
+```sh
+python -m venv linkdin-scrapper
+source linkdin-scrapper/bin/activate
+```
  ```sh
  pip install selenium beautifulsoup4 pandas
  ```
